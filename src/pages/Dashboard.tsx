@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import type { Rover } from '../types';
 import { 
   MapPin, 
   Gauge, 
@@ -91,7 +92,7 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [fluctuateData]);
 
-  const activeRover = rovers['ROVER-01'] || {
+  const activeRover: Rover = rovers['ROVER-01'] || {
     id: 'ROVER-01',
     name: 'FIELD UNIT 01',
     battery: 92,
@@ -102,8 +103,9 @@ const Dashboard: React.FC = () => {
     lng: 86.4307,
     altitude: -452,
     heading: 45,
-    gasStatus: 'SAFE' as const,
-    currentZone: 'Z-A1'
+    gasStatus: 'SAFE',
+    currentZone: 'Z-A1',
+    cameraMode: 'RGB'
   };
 
   const criticalZone = Object.values(zones).find(z => z.status === 'CRITICAL');
