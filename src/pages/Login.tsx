@@ -7,8 +7,8 @@ const Login: React.FC = () => {
   const { loginAdmin } = useStore();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('gits@admin.in');
-  const [password, setPassword] = useState('gits');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,15 +24,9 @@ const Login: React.FC = () => {
       if (ok) {
         navigate('/', { replace: true });
       } else {
-        setError('Invalid credentials. Use email: gits@admin.in and pass: gits');
+        setError('Invalid email or password. Please try again.');
       }
     }, 300);
-  };
-
-  const handleFillDemo = () => {
-    setEmail('gits@admin.in');
-    setPassword('gits');
-    setError(null);
   };
 
   return (
@@ -65,20 +59,11 @@ const Login: React.FC = () => {
         {/* Login Card */}
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs">
           
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Operator Sign In
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition"
-            >
-              Autofill Credentials
-            </button>
+          <div className="flex items-center space-x-2 pb-4 border-b border-slate-100 mb-6">
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Operator Sign In
+            </span>
           </div>
 
           {error && (
@@ -101,7 +86,7 @@ const Login: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
-                  placeholder="gits@admin.in"
+                  placeholder="name@organization.com"
                 />
               </div>
             </div>
@@ -118,12 +103,12 @@ const Login: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
-                  placeholder="gits"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -141,12 +126,6 @@ const Login: React.FC = () => {
               </button>
             </div>
           </form>
-
-          {/* Credentials badge */}
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Email: <strong className="text-slate-700">gits@admin.in</strong></span>
-            <span>Password: <strong className="text-slate-700">gits</strong></span>
-          </div>
 
         </div>
 

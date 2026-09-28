@@ -254,8 +254,8 @@ const Layout: React.FC = () => {
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="p-1.5 sm:p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 transition"
-            title="Sign Out (gits@admin.in)"
+            className="p-1.5 sm:p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 transition cursor-pointer"
+            title="Sign Out"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -339,7 +339,7 @@ const Layout: React.FC = () => {
           </NavLink>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between px-3 text-xs text-slate-500 font-mono">
-            <span>Operator: <strong>{admin?.email || 'gits@admin.in'}</strong></span>
+            <span>Operator: <strong>{admin?.email || 'Active'}</strong></span>
             <button
               onClick={handleLogout}
               className="text-rose-600 font-semibold hover:text-rose-800"

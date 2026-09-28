@@ -30,8 +30,8 @@ const AdminPanel: React.FC = () => {
   } = useStore();
 
   // Login form state
-  const [email, setEmail] = useState('gits@admin.in');
-  const [password, setPassword] = useState('gits');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Calibration state
@@ -47,7 +47,7 @@ const AdminPanel: React.FC = () => {
     setLoginError(null);
     const success = loginAdmin(email, password);
     if (!success) {
-      setLoginError('Invalid credentials. Use email: gits@admin.in and pass: gits');
+      setLoginError('Invalid credentials. Please verify your admin email and password.');
     }
   };
 
@@ -117,7 +117,7 @@ const AdminPanel: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  placeholder="gits@admin.in"
+                  placeholder="admin@organization.com"
                 />
               </div>
             </div>
@@ -133,7 +133,7 @@ const AdminPanel: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  placeholder="gits"
+                  placeholder="••••••••"
                 />
               </div>
             </div>
@@ -148,10 +148,6 @@ const AdminPanel: React.FC = () => {
               </button>
             </div>
           </form>
-
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-400 font-mono">
-            Default: <span className="font-bold text-slate-700">gits@admin.in</span> // Pass: <span className="font-bold text-slate-700">gits</span>
-          </div>
 
         </div>
       </div>
