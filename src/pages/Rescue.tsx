@@ -98,7 +98,7 @@ const Rescue: React.FC = () => {
         </div>
 
         {/* Video Canvas Container */}
-        <div className="relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-300 shadow-md min-h-[500px] flex items-center justify-center">
+        <div className="relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-300 shadow-md min-h-[280px] sm:min-h-[480px] flex items-center justify-center">
           
           {/* HTML5 Video Stream */}
           <video
@@ -150,7 +150,7 @@ const Rescue: React.FC = () => {
           </div>
 
           {/* Bottom Telemetry HUD Bar */}
-          <div className="absolute bottom-5 inset-x-5 z-20 flex items-center justify-between bg-slate-900/85 backdrop-blur-md p-4 rounded-xl border border-slate-700 text-white font-mono text-xs">
+          <div className="absolute bottom-3 sm:bottom-5 inset-x-3 sm:inset-x-5 z-20 flex flex-wrap sm:flex-nowrap items-center justify-between bg-slate-900/85 backdrop-blur-md p-3 sm:p-4 rounded-xl border border-slate-700 text-white font-mono text-[11px] sm:text-xs gap-2">
             <div className="flex items-center space-x-6">
               <div>
                 <span className="text-slate-400 text-[10px] block">POSITION</span>

@@ -441,7 +441,7 @@ const Dashboard: React.FC = () => {
           )}
 
           {/* Leaflet Map Canvas */}
-          <div className="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-200 relative z-0">
+          <div className="w-full h-[340px] sm:h-[460px] rounded-2xl overflow-hidden border border-slate-200 relative z-0">
             <MapContainer
               center={roverCoords}
               zoom={16}

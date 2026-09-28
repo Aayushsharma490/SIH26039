@@ -88,12 +88,24 @@ const initialSensorLogs: SensorLogEntry[] = [
   }
 ];
 
+const getStoredAdmin = (): AdminUser | null => {
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('minepulse_admin');
+      if (stored) return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Error reading stored admin session:', e);
+  }
+  return null;
+};
+
 const initialState: MineData = {
   systemOnline: true,
   rescueMode: false,
   firebaseConnected: true,
   lastSyncTime: new Date().toLocaleTimeString(),
-  admin: null,
+  admin: getStoredAdmin(),
   thresholds: {
     methaneLimit: 1.0,
     coLimit: 25,
@@ -211,13 +223,25 @@ export const useStore = create<StoreState>((set, get) => ({
         role: 'SUPERADMIN',
         authenticated: true
       };
+      try {
+        localStorage.setItem('minepulse_admin', JSON.stringify(adminObj));
+      } catch (e) {
+        console.warn('Could not save session:', e);
+      }
       set({ admin: adminObj });
       return true;
     }
     return false;
   },
 
-  logoutAdmin: () => set({ admin: null }),
+  logoutAdmin: () => {
+    try {
+      localStorage.removeItem('minepulse_admin');
+    } catch (e) {
+      console.warn('Could not remove session:', e);
+    }
+    set({ admin: null });
+  },
 
   updateThresholds: (data) => set((state) => ({
     thresholds: { ...state.thresholds, ...data }
