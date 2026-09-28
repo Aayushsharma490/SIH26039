@@ -129,6 +129,29 @@ export async function resetFirebaseLogsToOnePerSensor(cleanLogs: SensorLogEntry[
 }
 
 /**
+ * Clean & Purge entire Firebase database, removing all junk records
+ */
+export async function purgeAndResetFirebase(cleanLogs: SensorLogEntry[], initialState?: Partial<MineData>) {
+  try {
+    const map: Record<string, SensorLogEntry> = {};
+    for (const log of cleanLogs) {
+      map[log.sensorId] = {
+        ...log,
+        id: log.sensorId,
+      };
+    }
+    await set(LOGS_REF, map);
+    if (initialState) {
+      await seedInitialDataToFirebase(initialState);
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.warn('Firebase purge error:', error?.message);
+    return { success: false, error: error?.message };
+  }
+}
+
+/**
  * Subscribe in real time to Telemetry from Firebase RTDB
  */
 export function subscribeToTelemetry(callback: (data: any) => void) {

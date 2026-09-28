@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { MineData, Zone, Rover, Alert, EngineStatus, SensorLogEntry, SafetyThresholds, AdminUser } from '../types';
-import { seedInitialDataToFirebase, appendSensorLogToFirebase, resetFirebaseLogsToOnePerSensor } from '../services/firebase';
+import { seedInitialDataToFirebase, appendSensorLogToFirebase, resetFirebaseLogsToOnePerSensor, purgeAndResetFirebase } from '../services/firebase';
 
 interface StoreState extends MineData {
   theme: 'light' | 'dark';
@@ -14,6 +14,7 @@ interface StoreState extends MineData {
   addAlert: (alert: Alert) => void;
   addSensorLog: (entry: Omit<SensorLogEntry, 'id'>) => Promise<void>;
   resetLogsToOnePerSensor: () => Promise<void>;
+  purgeFirebaseData: () => Promise<boolean>;
   seedFirebase: () => Promise<boolean>;
   simulateEmergency: () => void;
   resetSimulation: () => void;
@@ -319,6 +320,20 @@ export const useStore = create<StoreState>((set, get) => ({
   resetLogsToOnePerSensor: async () => {
     await resetFirebaseLogsToOnePerSensor(initialSensorLogs);
     set({ sensorLogs: initialSensorLogs });
+  },
+
+  purgeFirebaseData: async () => {
+    const state = get();
+    const res = await purgeAndResetFirebase(initialSensorLogs, state);
+    if (res.success) {
+      set({ 
+        sensorLogs: initialSensorLogs,
+        firebaseConnected: true,
+        lastSyncTime: new Date().toLocaleTimeString() 
+      });
+      return true;
+    }
+    return false;
   },
 
   seedFirebase: async () => {

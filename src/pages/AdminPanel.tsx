@@ -11,7 +11,8 @@ import {
   RefreshCw, 
   Database, 
   CheckCircle2, 
-  XCircle
+  XCircle,
+  Trash2
 } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
@@ -26,6 +27,7 @@ const AdminPanel: React.FC = () => {
     engine, 
     updateEngine,
     seedFirebase,
+    purgeFirebaseData,
     sensorLogs
   } = useStore();
 
@@ -41,6 +43,8 @@ const AdminPanel: React.FC = () => {
   const [maxRpm, setMaxRpm] = useState(thresholds.maxEngineRpm);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +82,25 @@ const AdminPanel: React.FC = () => {
     setIsSyncing(true);
     await seedFirebase();
     setIsSyncing(false);
+    setCloudMsg('Cloud telemetry schemas re-synchronized successfully.');
+    setTimeout(() => setCloudMsg(null), 4000);
+  };
+
+  const handlePurgeCloud = async () => {
+    const confirmed = window.confirm(
+      "CONFIRMATION: Clean & Purge Firebase Database?\n\nThis will remove all duplicate or old junk records and reset the database to clean calibrated baseline sensors (1 log per sensor)."
+    );
+    if (!confirmed) return;
+
+    setIsPurging(true);
+    const success = await purgeFirebaseData();
+    setIsPurging(false);
+    if (success) {
+      setCloudMsg('Firebase Realtime Database cleaned! Exactly 1 record per sensor active.');
+    } else {
+      setCloudMsg('Error cleaning Firebase database. Check console logs.');
+    }
+    setTimeout(() => setCloudMsg(null), 5000);
   };
 
   // If not logged in, show clean admin login card
@@ -158,6 +181,19 @@ const AdminPanel: React.FC = () => {
   return (
     <div className="space-y-8 pb-16 font-sans max-w-5xl mx-auto">
       
+      {/* Cloud Operation Feedback */}
+      {cloudMsg && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-5 py-3 rounded-2xl flex items-center justify-between shadow-xs animate-fade-in">
+          <div className="flex items-center space-x-3 text-xs sm:text-sm font-semibold">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{cloudMsg}</span>
+          </div>
+          <button onClick={() => setCloudMsg(null)} className="text-emerald-700 hover:text-emerald-900 font-bold text-xs">
+            DISMISS
+          </button>
+        </div>
+      )}
+
       {/* Header bar */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
@@ -357,14 +393,23 @@ const AdminPanel: React.FC = () => {
                 <span className="font-bold text-emerald-600">CONNECTED</span>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <button
                   onClick={handleReSeedCloud}
-                  disabled={isSyncing}
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition"
+                  disabled={isSyncing || isPurging}
+                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>Sync Cloud Schemas</span>
+                </button>
+
+                <button
+                  onClick={handlePurgeCloud}
+                  disabled={isPurging || isSyncing}
+                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className={`w-3.5 h-3.5 text-rose-600 ${isPurging ? 'animate-spin' : ''}`} />
+                  <span>{isPurging ? 'Purging RTDB...' : 'Clean & Purge Firebase RTDB'}</span>
                 </button>
               </div>
             </div>
