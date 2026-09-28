@@ -3,23 +3,18 @@ import { useStore } from '../store/useStore';
 import { 
   FileText, 
   Download, 
-  UploadCloud, 
   Search, 
   Filter, 
   CheckCircle2, 
   AlertTriangle, 
   XCircle, 
-  RefreshCw,
-  Database,
   SlidersHorizontal
 } from 'lucide-react';
-import type { SensorLogEntry } from '../types';
 
 const SensorReports: React.FC = () => {
-  const { sensorLogs, addSensorLog, lastSyncTime, seedFirebase } = useStore();
+  const { sensorLogs, lastSyncTime } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('ALL');
-  const [isPushing, setIsPushing] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   // Filter logs
@@ -75,66 +70,6 @@ const SensorReports: React.FC = () => {
     showFeedback('JSON Log file exported and downloaded successfully.');
   };
 
-  // Transmit new test sensor packet to Firebase
-  const handleSendTestToFirebase = async () => {
-    setIsPushing(true);
-    const randomParam = Math.random();
-    let entry: Omit<SensorLogEntry, 'id'>;
-
-    if (randomParam > 0.6) {
-      entry = {
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        sensorId: 'CH4-SENS-A02',
-        parameter: 'Methane (CH₄)',
-        value: +(0.15 + Math.random() * 0.1).toFixed(2),
-        unit: '%',
-        threshold: '< 1.00 %',
-        severity: 'NOMINAL',
-        location: 'Sector-A01 Face East',
-        remarks: 'Live reading uploaded directly to Firebase Realtime Database.'
-      };
-    } else if (randomParam > 0.3) {
-      entry = {
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        sensorId: 'ENG-MTR-CURR',
-        parameter: 'Engine Propulsion Current',
-        value: Math.round(28 + Math.random() * 10),
-        unit: 'A',
-        threshold: '< 55 A',
-        severity: 'NOMINAL',
-        location: 'Field Unit 01 Drive Inverter',
-        remarks: 'Motor phase draw normal during forward crawl.'
-      };
-    } else {
-      entry = {
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        sensorId: 'CO-ELECTRO-09',
-        parameter: 'Carbon Monoxide (CO)',
-        value: Math.round(18 + Math.random() * 5),
-        unit: 'PPM',
-        threshold: '< 25 PPM',
-        severity: 'NOMINAL',
-        location: 'Sector-B12 Airway',
-        remarks: 'Gas sensor baseline calibration confirmed.'
-      };
-    }
-
-    await addSensorLog(entry);
-    setIsPushing(false);
-    showFeedback('New telemetry packet transmitted to Firebase Realtime Database.');
-  };
-
-  const handleSeedAll = async () => {
-    setIsPushing(true);
-    const ok = await seedFirebase();
-    setIsPushing(false);
-    if (ok) {
-      showFeedback('All telemetry and sensor log schemas synchronized with Firebase!');
-    } else {
-      showFeedback('Firebase sync notice: Local database updated.');
-    }
-  };
-
   const showFeedback = (msg: string) => {
     setFeedbackMsg(msg);
     setTimeout(() => setFeedbackMsg(null), 4000);
@@ -182,7 +117,7 @@ const SensorReports: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl text-sm font-semibold shadow-sm transition hover:bg-slate-50"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl text-xs font-semibold shadow-xs transition hover:bg-slate-50"
             title="Download CSV spreadsheet"
           >
             <Download className="w-4 h-4 text-slate-500" />
@@ -191,29 +126,11 @@ const SensorReports: React.FC = () => {
 
           <button
             onClick={handleExportJSON}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl text-sm font-semibold shadow-sm transition hover:bg-slate-50"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition"
             title="Download JSON log file"
           >
-            <FileText className="w-4 h-4 text-slate-500" />
+            <FileText className="w-4 h-4 text-slate-300" />
             <span>Download JSON Log</span>
-          </button>
-
-          <button
-            onClick={handleSendTestToFirebase}
-            disabled={isPushing}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-sm transition disabled:opacity-50"
-          >
-            {isPushing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-            <span>Transmit to Firebase</span>
-          </button>
-
-          <button
-            onClick={handleSeedAll}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold shadow-sm transition"
-            title="Sync all initial schemas to Firebase"
-          >
-            <Database className="w-4 h-4 text-slate-300" />
-            <span>Sync Schemas</span>
           </button>
         </div>
       </div>

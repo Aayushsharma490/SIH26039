@@ -77,6 +77,19 @@ export interface MeshNode {
   type: 'GATEWAY' | 'ROVER' | 'SENSOR';
 }
 
+export interface AdminUser {
+  email: string;
+  role: 'SUPERADMIN' | 'OPERATOR';
+  authenticated: boolean;
+}
+
+export interface SafetyThresholds {
+  methaneLimit: number;
+  coLimit: number;
+  tempLimit: number;
+  maxEngineRpm: number;
+}
+
 export interface MineData {
   systemOnline: boolean;
   rescueMode: boolean;
@@ -88,4 +101,7 @@ export interface MineData {
   alerts: Alert[];
   meshNodes: Record<string, MeshNode>;
   sensorLogs: SensorLogEntry[];
+  admin: AdminUser | null;
+  thresholds: SafetyThresholds;
+  userLiveCoords: [number, number] | null;
 }

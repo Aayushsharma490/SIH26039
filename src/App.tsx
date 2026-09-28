@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Rescue from './pages/Rescue';
 import MeshNetwork from './pages/MeshNetwork';
 import SensorReports from './pages/SensorReports';
+import AdminPanel from './pages/AdminPanel';
 import { useStore } from './store/useStore';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="rescue" element={<Rescue />} />
           <Route path="reports" element={<SensorReports />} />
           <Route path="network" element={<MeshNetwork />} />
+          <Route path="admin" element={<AdminPanel />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

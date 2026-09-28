@@ -14,54 +14,55 @@ import {
   Pause, 
   FileText,
   ArrowUpRight, 
-  UploadCloud,
-  CheckCircle2,
-  Navigation,
-  Compass,
-  Cpu,
-  Video
+  CheckCircle2, 
+  Navigation, 
+  Compass, 
+  Cpu, 
+  Video,
+  LocateFixed
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
-// Custom clean Leaflet Icons
+// Custom clean Leaflet Zone Icons
 const createZoneIcon = (status: 'SAFE' | 'WARNING' | 'CRITICAL') => {
   const bg = status === 'CRITICAL' ? '#dc2626' : status === 'WARNING' ? '#d97706' : '#059669';
   const pulse = status === 'CRITICAL' || status === 'WARNING';
 
   return L.divIcon({
     html: `
-      <div style="position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
-        ${pulse ? `<div style="position:absolute; inset:0; border-radius:50%; background:${bg}; opacity:0.3; animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>` : ''}
-        <div style="width:14px; height:14px; border-radius:50%; background:${bg}; border:2.5px solid #ffffff; box-shadow:0 2px 5px rgba(0,0,0,0.3); z-index:10;"></div>
+      <div style="position:relative; width:26px; height:26px; display:flex; align-items:center; justify-content:center;">
+        ${pulse ? `<div style="position:absolute; inset:0; border-radius:50%; background:${bg}; opacity:0.35; animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>` : ''}
+        <div style="width:14px; height:14px; border-radius:50%; background:${bg}; border:2.5px solid #ffffff; box-shadow:0 2px 6px rgba(0,0,0,0.25); z-index:10;"></div>
       </div>
     `,
     className: '',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
   });
 };
 
+// Directional live marker
 const createLiveVehicleIcon = (heading: number) => {
   return L.divIcon({
     html: `
-      <div style="position:relative; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">
+      <div style="position:relative; width:38px; height:38px; display:flex; align-items:center; justify-content:center;">
         <div style="position:absolute; inset:-4px; border-radius:50%; border:2px solid #2563eb; opacity:0.4; animation:pulse 2s infinite;"></div>
-        <div style="width:26px; height:26px; border-radius:50%; background:#2563eb; border:2.5px solid #ffffff; box-shadow:0 4px 10px rgba(37,99,235,0.4); display:flex; align-items:center; justify-content:center; color:#ffffff; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <div style="width:28px; height:28px; border-radius:50%; background:#2563eb; border:2.5px solid #ffffff; box-shadow:0 4px 10px rgba(37,99,235,0.4); display:flex; align-items:center; justify-content:center; color:#ffffff; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
           </svg>
         </div>
       </div>
     `,
     className: '',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
   });
 };
 
-// Component to dynamically pan map when rover position changes
+// Dynamic Map Recenter component
 const MapRecenter: React.FC<{ coords: [number, number], follow: boolean }> = ({ coords, follow }) => {
   const map = useMap();
   useEffect(() => {
@@ -80,27 +81,54 @@ const Dashboard: React.FC = () => {
     alerts, 
     fluctuateData, 
     toggleEngineActive,
-    addSensorLog
+    setUserLiveCoords,
+    userLiveCoords,
+    thresholds
   } = useStore();
 
   const [followRover, setFollowRover] = useState(true);
-  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<string | null>(null);
 
   // Real-time fluctuation tick
   useEffect(() => {
-    const interval = setInterval(fluctuateData, 1800);
+    const interval = setInterval(fluctuateData, 2000);
     return () => clearInterval(interval);
   }, [fluctuateData]);
 
+  // Request actual user browser geolocation on component mount
+  const handleAcquireLocation = () => {
+    if ('geolocation' in navigator) {
+      setGpsStatus('Locating device...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setUserLiveCoords([lat, lng]);
+          setGpsStatus('GPS Locked to Current Location');
+          setTimeout(() => setGpsStatus(null), 3500);
+        },
+        (err) => {
+          setGpsStatus('GPS access denied or unavailable');
+          setTimeout(() => setGpsStatus(null), 3500);
+          console.warn('Geolocation notice:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setGpsStatus('Geolocation not supported in browser');
+      setTimeout(() => setGpsStatus(null), 3000);
+    }
+  };
+
   const activeRover: Rover = rovers['ROVER-01'] || {
     id: 'ROVER-01',
-    name: 'FIELD UNIT 01',
+    name: 'Field Unit 01',
     battery: 92,
     signal: 96,
     speed: 4.8,
     temperature: 34.2,
-    lat: 23.7954,
-    lng: 86.4307,
+    lat: userLiveCoords ? userLiveCoords[0] : 23.7954,
+    lng: userLiveCoords ? userLiveCoords[1] : 86.4307,
     altitude: -452,
     heading: 45,
     gasStatus: 'SAFE',
@@ -111,90 +139,25 @@ const Dashboard: React.FC = () => {
   const criticalZone = Object.values(zones).find(z => z.status === 'CRITICAL');
   const roverCoords: [number, number] = [activeRover.lat, activeRover.lng];
 
-  // Manual fast transmission to Firebase
-  const handlePushSample = async () => {
-    setPushStatus('Sending...');
-    await addSensorLog({
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      sensorId: 'GEO-LOC-GPS',
-      parameter: 'Field Position Telemetry',
-      value: `${activeRover.lat.toFixed(4)}N, ${activeRover.lng.toFixed(4)}E`,
-      unit: 'GPS',
-      threshold: 'Underground Sector Bounds',
-      severity: 'NOMINAL',
-      location: activeRover.currentZone,
-      remarks: `Rover moving at ${activeRover.speed} km/h, Heading ${activeRover.heading}°`
-    });
-    setPushStatus('Synced with Firebase RTDB');
-    setTimeout(() => setPushStatus(null), 3000);
-  };
-
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <div className="space-y-7 pb-12 font-sans">
       
-      {/* SECTION 1: REAL-TIME ACTIVE TELEMETRY BAR */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center space-x-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Real-Time Active Telemetry
-            </h2>
-            <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              STATION ID: MC-DHN-01
-            </span>
-          </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Continuous real-time duplex stream between underground autonomous crawler and surface command.
-          </p>
-        </div>
-
-        {/* Telemetry KPIs */}
-        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-            <span className="text-slate-400 uppercase font-semibold block text-[10px]">Uplink Quality</span>
-            <span className="text-sm font-bold text-slate-800">99.4% (Carrier Lock)</span>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-            <span className="text-slate-400 uppercase font-semibold block text-[10px]">Stream Latency</span>
-            <span className="text-sm font-bold text-emerald-600">32 ms</span>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-            <span className="text-slate-400 uppercase font-semibold block text-[10px]">Packet Cadence</span>
-            <span className="text-sm font-bold text-slate-800">48 pkts/sec</span>
-          </div>
-
-          <button
-            onClick={handlePushSample}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>{pushStatus || 'Push Frame to Firebase'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Critical Alert Warning if active */}
+      {/* Critical Alert Warning Banner */}
       {criticalZone && (
-        <div className="bg-rose-50 border-l-4 border-rose-600 p-5 rounded-r-2xl shadow-sm flex items-start justify-between">
+        <div className="bg-rose-50 border-l-4 border-rose-600 p-5 rounded-r-2xl shadow-xs flex items-start justify-between">
           <div className="flex items-start space-x-3.5">
-            <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-bold text-rose-900 uppercase tracking-wide">
-                  Critical Atmospheric Anomaly Detected
+                  Atmospheric Anomaly Warning
                 </span>
                 <span className="text-xs font-mono font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded">
                   {criticalZone.name}
                 </span>
               </div>
               <p className="text-sm text-rose-700 mt-1">
-                Methane concentration spiked to <span className="font-bold">{criticalZone.methane.toFixed(2)}%</span>. Standard DGMS ceiling is 1.00%. Emergency ventilation protocol engaged.
+                Methane concentration spiked to <span className="font-bold">{criticalZone.methane.toFixed(2)}%</span> (Ceiling: {thresholds.methaneLimit.toFixed(2)}%). Auxiliary fans engaged.
               </p>
             </div>
           </div>
@@ -202,33 +165,33 @@ const Dashboard: React.FC = () => {
             to="/reports"
             className="text-xs font-bold text-rose-800 hover:text-rose-950 underline shrink-0 mt-1"
           >
-            View Sensor Log Report →
+            Review Audit Log →
           </Link>
         </div>
       )}
 
-      {/* SECTION 2: ENGINE & PROPULSION ACTIVE MONITOR */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-200 gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200">
+      {/* SECTION 1: ENGINE & PROPULSION ACTIVE MONITOR */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
               <Gauge className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-bold text-slate-900">
+              <div className="flex items-center space-x-2.5">
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                   Engine & Propulsion Status
-                </h3>
+                </h2>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                   engine.active 
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                     : 'bg-slate-100 text-slate-600 border border-slate-200'
                 }`}>
                   {engine.active ? 'ENGINE ACTIVE' : 'ENGINE STANDBY'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Field Unit 01 Electric Drivetrain & Battery Management Subsystem
+              <p className="text-xs text-slate-400 mt-0.5">
+                Autonomous field unit electric powertrain and energy telemetry
               </p>
             </div>
           </div>
@@ -238,8 +201,8 @@ const Dashboard: React.FC = () => {
               onClick={toggleEngineActive}
               className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition ${
                 engine.active 
-                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300' 
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
               }`}
             >
               {engine.active ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -251,26 +214,24 @@ const Dashboard: React.FC = () => {
         {/* Engine Telemetry Gauges */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 pt-5">
           
-          {/* RPM Gauge */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Engine RPM</div>
-            <div className="text-2xl font-bold font-mono text-slate-900 mt-2">{engine.rpm}</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Engine RPM</div>
+            <div className="text-2xl font-bold font-mono text-slate-900 mt-1.5">{engine.rpm}</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div 
                 className="bg-blue-600 h-full rounded-full transition-all duration-500" 
-                style={{ width: `${Math.min(100, (engine.rpm / 2200) * 100)}%` }}
+                style={{ width: `${Math.min(100, (engine.rpm / thresholds.maxEngineRpm) * 100)}%` }}
               ></div>
             </div>
             <div className="text-[10px] text-slate-400 font-mono mt-1 flex justify-between">
               <span>0</span>
-              <span>2200 max</span>
+              <span>{thresholds.maxEngineRpm} max</span>
             </div>
           </div>
 
-          {/* Engine Load */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Motor Load</div>
-            <div className="text-2xl font-bold font-mono text-slate-900 mt-2">{engine.load}%</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Motor Load</div>
+            <div className="text-2xl font-bold font-mono text-slate-900 mt-1.5">{engine.load}%</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div 
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
@@ -280,23 +241,21 @@ const Dashboard: React.FC = () => {
             <div className="text-[10px] text-slate-400 font-mono mt-1">Torque Output: 68 Nm</div>
           </div>
 
-          {/* Coolant Temp */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Coolant Temp</div>
-            <div className="text-2xl font-bold font-mono text-slate-900 mt-2">{engine.coolantTemp}°C</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Coolant Temp</div>
+            <div className="text-2xl font-bold font-mono text-slate-900 mt-1.5">{engine.coolantTemp}°C</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div 
-                className={`h-full rounded-full transition-all duration-500 ${engine.coolantTemp > 85 ? 'bg-rose-500' : 'bg-blue-500'}`} 
+                className={`h-full rounded-full transition-all duration-500 ${engine.coolantTemp > 85 ? 'bg-rose-500' : 'bg-blue-600'}`} 
                 style={{ width: `${Math.min(100, (engine.coolantTemp / 110) * 100)}%` }}
               ></div>
             </div>
             <div className="text-[10px] text-slate-400 font-mono mt-1">Normal Range &lt; 90°C</div>
           </div>
 
-          {/* Battery Voltage */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pack Voltage</div>
-            <div className="text-2xl font-bold font-mono text-slate-900 mt-2">{engine.batteryVoltage} V</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pack Voltage</div>
+            <div className="text-2xl font-bold font-mono text-slate-900 mt-1.5">{engine.batteryVoltage} V</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div 
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
@@ -306,51 +265,49 @@ const Dashboard: React.FC = () => {
             <div className="text-[10px] text-slate-400 font-mono mt-1">LiFePO4 16S Pack</div>
           </div>
 
-          {/* Drive Gear & Throttle */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Drive Mode</div>
-            <div className="text-2xl font-bold font-mono text-blue-700 mt-2">{engine.gearMode}</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Drive Mode</div>
+            <div className="text-2xl font-bold font-mono text-blue-700 mt-1.5">{engine.gearMode}</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div className="bg-blue-600 h-full rounded-full" style={{ width: `${engine.throttle}%` }}></div>
             </div>
             <div className="text-[10px] text-slate-400 font-mono mt-1">Throttle: {engine.throttle}%</div>
           </div>
 
-          {/* Oil Pressure */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hydraulic PSI</div>
-            <div className="text-2xl font-bold font-mono text-slate-900 mt-2">{engine.oilPressure}</div>
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Hydraulic PSI</div>
+            <div className="text-2xl font-bold font-mono text-slate-900 mt-1.5">{engine.oilPressure}</div>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-3 overflow-hidden">
               <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${(engine.oilPressure / 60) * 100}%` }}></div>
             </div>
-            <div className="text-[10px] text-slate-400 font-mono mt-1">Operating Hours: {engine.operatingHours}h</div>
+            <div className="text-[10px] text-slate-400 font-mono mt-1">Runtime: {engine.operatingHours}h</div>
           </div>
         </div>
 
         {/* Diagnostic Codes Bar */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600 font-mono gap-2">
           <div className="flex items-center space-x-2">
-            <Cpu className="w-4 h-4 text-slate-400" />
-            <span className="font-bold text-slate-700">Active DTC:</span>
+            <Cpu className="w-3.5 h-3.5 text-slate-400" />
+            <span className="font-bold text-slate-700">ECU DTC:</span>
             {engine.diagnosticCodes.map((code, idx) => (
-              <span key={idx} className="bg-slate-100 px-2.5 py-1 rounded text-slate-700 border border-slate-200">
+              <span key={idx} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 border border-slate-200 text-[11px]">
                 {code}
               </span>
             ))}
           </div>
-          <span className="text-emerald-700 font-bold flex items-center space-x-1">
+          <span className="text-emerald-700 font-medium flex items-center space-x-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>ECU Firmware v2.4.1 Certified</span>
+            <span>Telemetry Certified</span>
           </span>
         </div>
       </div>
 
-      {/* SECTION 3: ATMOSPHERIC & ENVIRONMENTAL SENSORS */}
+      {/* SECTION 2: ATMOSPHERIC & ENVIRONMENTAL SENSORS */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3.5">
           <div className="flex items-center space-x-2">
-            <Wind className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+            <Wind className="w-4 h-4 text-blue-600" />
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">
               Atmospheric & Environmental Sensors
             </h3>
           </div>
@@ -358,7 +315,7 @@ const Dashboard: React.FC = () => {
             to="/reports"
             className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1"
           >
-            <span>Open Sensor Report Register</span>
+            <span>Sensor Log Register</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -369,35 +326,31 @@ const Dashboard: React.FC = () => {
               label: 'Methane (CH₄)',
               value: criticalZone ? criticalZone.methane : 0.18,
               unit: '%',
-              limit: '< 1.00 %',
-              isCrit: (criticalZone ? criticalZone.methane : 0.18) > 1.0,
+              limit: `< ${thresholds.methaneLimit.toFixed(2)} %`,
               icon: Wind,
-              status: (criticalZone ? criticalZone.methane : 0.18) > 1.0 ? 'CRITICAL' : 'SAFE'
+              status: (criticalZone ? criticalZone.methane : 0.18) > thresholds.methaneLimit ? 'CRITICAL' : 'SAFE'
             },
             {
               label: 'Carbon Monoxide (CO)',
               value: criticalZone ? criticalZone.co : 14,
               unit: 'PPM',
-              limit: '< 25 PPM',
-              isCrit: (criticalZone ? criticalZone.co : 14) > 30,
+              limit: `< ${thresholds.coLimit} PPM`,
               icon: Wind,
-              status: (criticalZone ? criticalZone.co : 14) > 25 ? 'ADVISORY' : 'SAFE'
+              status: (criticalZone ? criticalZone.co : 14) > thresholds.coLimit ? 'ADVISORY' : 'SAFE'
             },
             {
               label: 'Ambient Temp',
               value: criticalZone ? criticalZone.temperature : 24.8,
               unit: '°C',
-              limit: '< 35.0 °C',
-              isCrit: (criticalZone ? criticalZone.temperature : 24.8) > 35,
+              limit: `< ${thresholds.tempLimit.toFixed(1)} °C`,
               icon: Thermometer,
-              status: 'SAFE'
+              status: (criticalZone ? criticalZone.temperature : 24.8) > thresholds.tempLimit ? 'WARNING' : 'SAFE'
             },
             {
               label: 'Relative Humidity',
               value: criticalZone ? criticalZone.humidity : 48,
               unit: '%',
               limit: '30 - 70 %',
-              isCrit: false,
               icon: Droplets,
               status: 'SAFE'
             },
@@ -406,18 +359,17 @@ const Dashboard: React.FC = () => {
               value: 3.4,
               unit: 'm/s',
               limit: '> 2.0 m/s',
-              isCrit: false,
               icon: ShieldCheck,
               status: 'OPTIMAL'
             }
           ].map((item, idx) => (
-            <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+            <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{item.label}</span>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{item.label}</span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                   item.status === 'CRITICAL' 
                     ? 'bg-rose-100 text-rose-700 border border-rose-200' 
-                    : item.status === 'ADVISORY' 
+                    : item.status === 'ADVISORY' || item.status === 'WARNING'
                     ? 'bg-amber-100 text-amber-700 border border-amber-200' 
                     : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                 }`}>
@@ -425,61 +377,77 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3">
                 <div className="text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
                   {typeof item.value === 'number' ? item.value.toFixed(1) : item.value}{' '}
-                  <span className="text-xs font-normal text-slate-500">{item.unit}</span>
+                  <span className="text-xs font-normal text-slate-400">{item.unit}</span>
                 </div>
-                <div className="text-xs text-slate-400 font-mono mt-1">Limit: {item.limit}</div>
+                <div className="text-[11px] text-slate-400 font-mono mt-1">Limit: {item.limit}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* SECTION 4: GPS GEOLOCATION & LIVE SPATIAL TRACKING (LEAFLET MAP) */}
+      {/* SECTION 3: GPS GEOLOCATION & REAL LOCATION TRACKING */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Leaflet Map with Live Vehicle Marker */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3 mb-4">
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs flex flex-col">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3 mb-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-50 text-blue-700 rounded-xl border border-blue-200">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
                 <MapPin className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Live Topographical & Underground GPS Map
+                <h3 className="text-base font-bold text-slate-900">
+                  Live Topographical & GPS Map
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Real-time Leaflet tracking with spatial sector boundaries & live marker
+                <p className="text-xs text-slate-400">
+                  Real-time positioning with live marker and sector boundary monitoring
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-2">
               <button
+                onClick={handleAcquireLocation}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
+                title="Detect live browser GPS coordinates"
+              >
+                <LocateFixed className="w-3.5 h-3.5 text-blue-600" />
+                <span>My Live GPS Location</span>
+              </button>
+
+              <button
                 onClick={() => setFollowRover(!followRover)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono border transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-mono border transition ${
                   followRover
-                    ? 'bg-blue-50 text-blue-700 border-blue-300'
+                    ? 'bg-slate-900 text-white border-slate-900'
                     : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}
               >
-                {followRover ? 'LOCK TO MARKER' : 'FREE PAN'}
+                {followRover ? 'LOCKED' : 'FREE PAN'}
               </button>
             </div>
           </div>
 
-          {/* Leaflet Map Container */}
-          <div className="w-full h-[460px] rounded-xl overflow-hidden border border-slate-200 relative z-0">
+          {/* GPS Status feedback */}
+          {gpsStatus && (
+            <div className="mb-3 px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl flex items-center space-x-2">
+              <LocateFixed className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+              <span>{gpsStatus}</span>
+            </div>
+          )}
+
+          {/* Leaflet Map Canvas */}
+          <div className="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-200 relative z-0">
             <MapContainer
               center={roverCoords}
               zoom={16}
               className="w-full h-full"
               zoomControl={true}
             >
-              {/* Clean Standard OpenStreetMap Tiles */}
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -487,7 +455,7 @@ const Dashboard: React.FC = () => {
 
               <MapRecenter coords={roverCoords} follow={followRover} />
 
-              {/* Mining Sector Markers and Safe/Warning Zones */}
+              {/* Sector Markers */}
               {Object.values(zones).map((zone) => {
                 const icon = createZoneIcon(zone.status);
                 const color = zone.status === 'CRITICAL' ? '#dc2626' : zone.status === 'WARNING' ? '#d97706' : '#059669';
@@ -543,39 +511,39 @@ const Dashboard: React.FC = () => {
             </MapContainer>
 
             {/* Floating Live Coordinates HUD */}
-            <div className="absolute bottom-4 left-4 z-1000 bg-white/95 backdrop-blur-sm border border-slate-200 px-4 py-2.5 rounded-xl shadow-md text-xs font-mono text-slate-700 space-y-1">
+            <div className="absolute bottom-4 left-4 z-1000 bg-white/95 backdrop-blur-sm border border-slate-200 px-4 py-2.5 rounded-2xl shadow-sm text-xs font-mono text-slate-700 space-y-1">
               <div className="flex items-center space-x-2 font-bold text-blue-700">
                 <Compass className="w-3.5 h-3.5" />
-                <span>LIVE GPS FIX: ACTIVE</span>
+                <span>LIVE POSITION FIX</span>
               </div>
               <div className="text-[11px] text-slate-600">
                 LAT: <span className="font-bold">{activeRover.lat.toFixed(6)}°</span> | LNG: <span className="font-bold">{activeRover.lng.toFixed(6)}°</span>
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-slate-400">
                 DEPTH: {activeRover.altitude}m | SPEED: {activeRover.speed} km/h | HEADING: {activeRover.heading}°
               </div>
             </div>
           </div>
         </div>
 
-        {/* Live Event Stream & Report Shortcut Card */}
+        {/* Video Peek & Event Stream */}
         <div className="space-y-6 flex flex-col">
           
           {/* Quick Inspection Peek */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center space-x-2">
                 <Video className="w-4 h-4 text-blue-600" />
-                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                  Optical Feed Peek
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  Live Camera Feed
                 </h4>
               </div>
               <Link to="/rescue" className="text-xs font-semibold text-blue-600 hover:text-blue-800">
-                Full Screen →
+                Full Feed →
               </Link>
             </div>
 
-            <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video border border-slate-300">
+            <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video border border-slate-200">
               <video
                 autoPlay
                 loop
@@ -595,22 +563,22 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Real-time Event Stream */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex-1 flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex-1 flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center space-x-2">
                 <Radio className="w-4 h-4 text-slate-700" />
-                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                  Recent Telemetry Events
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  Event Stream
                 </h4>
               </div>
               <Link to="/reports" className="text-xs font-semibold text-blue-600 hover:text-blue-800">
-                All Logs →
+                Full Register →
               </Link>
             </div>
 
             <div className="space-y-3 flex-1 overflow-y-auto max-h-[220px] pr-1 font-mono text-xs">
               {alerts.slice(0, 4).map((a) => (
-                <div key={a.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div key={a.id} className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
                   <div className="flex items-center justify-between text-[11px] mb-1">
                     <span className={`font-bold px-2 py-0.5 rounded ${
                       a.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-800' :
@@ -626,14 +594,13 @@ const Dashboard: React.FC = () => {
               ))}
             </div>
 
-            {/* Direct Link to Comprehensive Audit Report */}
             <div className="mt-4 pt-4 border-t border-slate-100">
               <Link
                 to="/reports"
-                className="w-full flex items-center justify-center space-x-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition shadow-sm"
+                className="w-full flex items-center justify-center space-x-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition shadow-xs"
               >
                 <FileText className="w-4 h-4" />
-                <span>View Comprehensive Sensor Report File</span>
+                <span>View Full Sensor Audit Report</span>
               </Link>
             </div>
           </div>

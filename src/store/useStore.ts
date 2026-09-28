@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { MineData, Zone, Rover, Alert, EngineStatus, SensorLogEntry } from '../types';
+import type { MineData, Zone, Rover, Alert, EngineStatus, SensorLogEntry, SafetyThresholds, AdminUser } from '../types';
 import { seedInitialDataToFirebase, appendSensorLogToFirebase } from '../services/firebase';
 
 interface StoreState extends MineData {
@@ -19,6 +19,10 @@ interface StoreState extends MineData {
   fluctuateData: () => void;
   loadFirebaseTelemetry: (data: any) => void;
   loadFirebaseLogs: (logs: SensorLogEntry[]) => void;
+  loginAdmin: (email: string, pass: string) => boolean;
+  logoutAdmin: () => void;
+  updateThresholds: (data: Partial<SafetyThresholds>) => void;
+  setUserLiveCoords: (coords: [number, number]) => void;
 }
 
 const initialSensorLogs: SensorLogEntry[] = [
@@ -32,7 +36,7 @@ const initialSensorLogs: SensorLogEntry[] = [
     threshold: '< 1.00 %',
     severity: 'NOMINAL',
     location: 'Sector-A01 North Drift',
-    remarks: 'Atmospheric levels within OSHA & DGMS safety limits.'
+    remarks: 'Atmospheric levels within safety limits.'
   },
   {
     id: 'LOG-1091',
@@ -56,7 +60,7 @@ const initialSensorLogs: SensorLogEntry[] = [
     threshold: '< 25 PPM',
     severity: 'ADVISORY',
     location: 'Sector-B12 Stope Face',
-    remarks: 'Minor exhaust accumulation, auxiliary scrubber operational.'
+    remarks: 'Minor accumulation, auxiliary scrubber operational.'
   },
   {
     id: 'LOG-1089',
@@ -68,7 +72,7 @@ const initialSensorLogs: SensorLogEntry[] = [
     threshold: '< 35.0 °C',
     severity: 'NOMINAL',
     location: 'Sector-A01 Main Gallery',
-    remarks: 'Ventilation current nominal at 3.2 m/s.'
+    remarks: 'Ventilation current nominal.'
   },
   {
     id: 'LOG-1088',
@@ -81,18 +85,6 @@ const initialSensorLogs: SensorLogEntry[] = [
     severity: 'NOMINAL',
     location: 'Field Unit 01 Power Module',
     remarks: 'LiFePO4 balance delta 12mV, temperature 32.1°C.'
-  },
-  {
-    id: 'LOG-1087',
-    timestamp: '2026-09-28 20:58:10',
-    sensorId: 'COOL-PRESS-02',
-    parameter: 'Coolant Loop Pressure',
-    value: 42.1,
-    unit: 'PSI',
-    threshold: '35 - 55 PSI',
-    severity: 'NOMINAL',
-    location: 'Hydraulic & Cooling Skid',
-    remarks: 'Continuous flow cycle confirmed.'
   }
 ];
 
@@ -101,6 +93,14 @@ const initialState: MineData = {
   rescueMode: false,
   firebaseConnected: true,
   lastSyncTime: new Date().toLocaleTimeString(),
+  admin: null,
+  thresholds: {
+    methaneLimit: 1.0,
+    coLimit: 25,
+    tempLimit: 35.0,
+    maxEngineRpm: 2200
+  },
+  userLiveCoords: null,
   engine: {
     active: true,
     status: 'ONLINE',
@@ -121,7 +121,7 @@ const initialState: MineData = {
   zones: {
     'Z-A1': {
       id: 'Z-A1',
-      name: 'SECTOR-A01 (Main Drift)',
+      name: 'Sector-A01 (Main Gallery)',
       status: 'SAFE',
       riskScore: 12,
       methane: 0.12,
@@ -134,7 +134,7 @@ const initialState: MineData = {
     },
     'Z-B12': {
       id: 'Z-B12',
-      name: 'SECTOR-B12 (Extraction Face)',
+      name: 'Sector-B12 (Extraction Face)',
       status: 'WARNING',
       riskScore: 48,
       methane: 0.85,
@@ -147,7 +147,7 @@ const initialState: MineData = {
     },
     'Z-B14': {
       id: 'Z-B14',
-      name: 'SECTOR-B14 (Return Airway)',
+      name: 'Sector-B14 (Return Airway)',
       status: 'SAFE',
       riskScore: 18,
       methane: 0.22,
@@ -162,7 +162,7 @@ const initialState: MineData = {
   rovers: {
     'ROVER-01': {
       id: 'ROVER-01',
-      name: 'FIELD UNIT 01',
+      name: 'Field Unit 01',
       battery: 92,
       signal: 96,
       speed: 4.8,
@@ -180,7 +180,7 @@ const initialState: MineData = {
     {
       id: '1',
       severity: 'INFO',
-      message: 'SYSTEM TELEMETRY LINK: Active data handshake established with surface station.',
+      message: 'System active. Field Unit connected to surface console.',
       zone: 'ALL',
       timestamp: new Date().toLocaleTimeString(),
       status: 'ACTIVE'
@@ -199,10 +199,52 @@ const initialState: MineData = {
 
 export const useStore = create<StoreState>((set, get) => ({
   ...initialState,
-  theme: 'light', // Default to clean white/light theme as requested
+  theme: 'light',
   toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
   setRescueMode: (status) => set({ rescueMode: status }),
   setFirebaseConnected: (status) => set({ firebaseConnected: status }),
+
+  loginAdmin: (email, pass) => {
+    if (email.trim().toLowerCase() === 'gits@admin.in' && pass === 'gits') {
+      const adminObj: AdminUser = {
+        email: 'gits@admin.in',
+        role: 'SUPERADMIN',
+        authenticated: true
+      };
+      set({ admin: adminObj });
+      return true;
+    }
+    return false;
+  },
+
+  logoutAdmin: () => set({ admin: null }),
+
+  updateThresholds: (data) => set((state) => ({
+    thresholds: { ...state.thresholds, ...data }
+  })),
+
+  setUserLiveCoords: (coords) => set((state) => {
+    // Also position rover and nearby zones around the user's actual location
+    const [lat, lng] = coords;
+    const updatedRover: Rover = {
+      ...state.rovers['ROVER-01'],
+      lat,
+      lng
+    };
+
+    const updatedZones = {
+      ...state.zones,
+      'Z-A1': { ...state.zones['Z-A1'], lat: +(lat + 0.0005).toFixed(6), lng: +(lng - 0.0004).toFixed(6) },
+      'Z-B12': { ...state.zones['Z-B12'], lat: +(lat + 0.0012).toFixed(6), lng: +(lng + 0.0008).toFixed(6) },
+      'Z-B14': { ...state.zones['Z-B14'], lat: +(lat - 0.0008).toFixed(6), lng: +(lng - 0.0007).toFixed(6) }
+    };
+
+    return {
+      userLiveCoords: coords,
+      rovers: { ...state.rovers, 'ROVER-01': updatedRover },
+      zones: updatedZones
+    };
+  }),
 
   updateZone: (zoneId, data) => set((state) => ({
     zones: { ...state.zones, [zoneId]: { ...state.zones[zoneId], ...data } }
@@ -240,12 +282,10 @@ export const useStore = create<StoreState>((set, get) => ({
     const id = `LOG-${Date.now().toString().slice(-4)}`;
     const fullEntry: SensorLogEntry = { ...entry, id };
     
-    // Add locally immediately
     set((state) => ({
       sensorLogs: [fullEntry, ...state.sensorLogs].slice(0, 100)
     }));
 
-    // Push to Firebase RTDB
     await appendSensorLogToFirebase(entry);
   },
 
@@ -281,8 +321,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const alert: Alert = {
       id: Date.now().toString(),
       severity: 'CRITICAL',
-      message: 'SAFETY THRESHOLD EXCEEDED: Sector-B14 Methane concentration spiked to 2.45%. Emergency ventilation activated.',
-      zone: 'SECTOR-B14',
+      message: 'Methane threshold exceeded in Sector-B14 (2.45%). Safety interlock engaged.',
+      zone: 'Sector-B14',
       timestamp: new Date().toLocaleTimeString(),
       status: 'ACTIVE'
     };
@@ -294,7 +334,7 @@ export const useStore = create<StoreState>((set, get) => ({
       parameter: 'Methane (CH₄)',
       value: 2.45,
       unit: '%',
-      threshold: '< 1.00 %',
+      threshold: `< ${state.thresholds.methaneLimit.toFixed(2)} %`,
       severity: 'CRITICAL',
       location: 'Sector-B14 Return Airway',
       remarks: 'THRESHOLD TRIPPED. Autonomous power cutoff initiated.'
@@ -340,7 +380,6 @@ export const useStore = create<StoreState>((set, get) => ({
   resetSimulation: () => set(initialState),
 
   fluctuateData: () => set((state) => {
-    // Fluctuate zone atmospheric readings
     const newZones = { ...state.zones };
     Object.keys(newZones).forEach(key => {
       const z = newZones[key];
@@ -354,21 +393,18 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     });
 
-    // Fluctuate engine metrics if active
     let newEngine = { ...state.engine };
     if (newEngine.active) {
-      newEngine.rpm = Math.min(2200, Math.max(900, Math.round(newEngine.rpm + (Math.random() - 0.5) * 35)));
+      newEngine.rpm = Math.min(state.thresholds.maxEngineRpm, Math.max(900, Math.round(newEngine.rpm + (Math.random() - 0.5) * 35)));
       newEngine.load = Math.min(95, Math.max(20, Math.round(newEngine.load + (Math.random() - 0.5) * 4)));
       newEngine.coolantTemp = +(newEngine.coolantTemp + (Math.random() - 0.5) * 0.1).toFixed(1);
       newEngine.batteryVoltage = +(Math.max(44.0, newEngine.batteryVoltage - 0.001)).toFixed(2);
       newEngine.oilPressure = +(newEngine.oilPressure + (Math.random() - 0.5) * 0.2).toFixed(1);
     }
 
-    // Move rover position slightly along heading to show live GPS marker movement
     const newRovers = { ...state.rovers };
     const r = newRovers['ROVER-01'];
     if (r && newEngine.active) {
-      // gentle random walk around mining sector
       const deltaLat = (Math.random() - 0.49) * 0.00008;
       const deltaLng = (Math.random() - 0.48) * 0.00008;
       r.lat = +(r.lat + deltaLat).toFixed(6);
@@ -377,7 +413,6 @@ export const useStore = create<StoreState>((set, get) => ({
       r.heading = (r.heading + Math.floor((Math.random() - 0.5) * 6) + 360) % 360;
     }
 
-    // Mesh latency
     const newMesh = { ...state.meshNodes };
     Object.keys(newMesh).forEach(key => {
       if (newMesh[key].status === 'ONLINE') {
