@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getDatabase, ref, set, push, onValue, off, serverTimestamp } from 'firebase/database';
+import { getDatabase, ref, set, onValue, off, serverTimestamp } from 'firebase/database';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import type { MineData, SensorLogEntry, EngineStatus } from '../types';
 
@@ -18,7 +18,7 @@ export const firebaseConfig = {
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const rtdb = getDatabase(app);
 
-// Analytics initialization (safe for SSR/non-browser)
+// Analytics initialization (safe for browser)
 export let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
 if (typeof window !== 'undefined') {
   isSupported().then((supported) => {
@@ -26,17 +26,17 @@ if (typeof window !== 'undefined') {
       analyticsInstance = getAnalytics(app);
     }
   }).catch(() => {
-    // Analytics optional fallback
+    // Optional fallback
   });
 }
 
-// References
+// Fixed references
 const TELEMETRY_REF = ref(rtdb, 'sih26039/telemetry');
 const ENGINE_REF = ref(rtdb, 'sih26039/engine');
 const LOGS_REF = ref(rtdb, 'sih26039/sensor_logs');
 
 /**
- * Seed initial real-time telemetry and engine data to Firebase Realtime Database
+ * Seed telemetry state to Firebase without duplicating logs
  */
 export async function seedInitialDataToFirebase(initialState: Partial<MineData>) {
   try {
@@ -51,13 +51,6 @@ export async function seedInitialDataToFirebase(initialState: Partial<MineData>)
     };
 
     await set(TELEMETRY_REF, payload);
-    
-    // Also push an initial log batch if logs exist
-    if (initialState.sensorLogs && initialState.sensorLogs.length > 0) {
-      for (const log of initialState.sensorLogs) {
-        await push(LOGS_REF, log);
-      }
-    }
     return { success: true };
   } catch (error: any) {
     console.warn('Firebase seed notice:', error?.message || error);
@@ -98,19 +91,39 @@ export async function pushEngineUpdate(engine: EngineStatus) {
 }
 
 /**
- * Append a sensor log report entry to Firebase
+ * Overwrite or update a single sensor's log in Firebase (1 record per sensor tag)
  */
 export async function appendSensorLogToFirebase(log: Omit<SensorLogEntry, 'id'>) {
   try {
-    const newLogRef = push(LOGS_REF);
+    const sensorRef = ref(rtdb, `sih26039/sensor_logs/${log.sensorId}`);
     const entry: SensorLogEntry = {
       ...log,
-      id: newLogRef.key || Date.now().toString(),
+      id: log.sensorId,
     };
-    await set(newLogRef, entry);
+    await set(sensorRef, entry);
     return { success: true, entry };
   } catch (error: any) {
-    console.warn('Firebase log append error:', error?.message);
+    console.warn('Firebase log update error:', error?.message);
+    return { success: false, error: error?.message };
+  }
+}
+
+/**
+ * Reset Firebase sensor logs to EXACTLY 1 log per unique sensor
+ */
+export async function resetFirebaseLogsToOnePerSensor(cleanLogs: SensorLogEntry[]) {
+  try {
+    const map: Record<string, SensorLogEntry> = {};
+    for (const log of cleanLogs) {
+      map[log.sensorId] = {
+        ...log,
+        id: log.sensorId,
+      };
+    }
+    await set(LOGS_REF, map);
+    return { success: true };
+  } catch (error: any) {
+    console.warn('Firebase reset error:', error?.message);
     return { success: false, error: error?.message };
   }
 }
@@ -137,6 +150,7 @@ export function subscribeToTelemetry(callback: (data: any) => void) {
 
 /**
  * Subscribe in real time to Sensor Logs from Firebase RTDB
+ * Always deduplicates and enforces exactly 1 record per sensor
  */
 export function subscribeToSensorLogs(callback: (logs: SensorLogEntry[]) => void) {
   const listener = onValue(
@@ -144,11 +158,18 @@ export function subscribeToSensorLogs(callback: (logs: SensorLogEntry[]) => void
     (snapshot) => {
       const val = snapshot.val();
       if (val) {
-        const list: SensorLogEntry[] = Object.keys(val).map((k) => ({
-          ...val[k],
-          id: k,
-        }));
-        callback(list.reverse()); // most recent first
+        const sensorMap = new Map<string, SensorLogEntry>();
+        const keys = Object.keys(val);
+        for (const k of keys) {
+          const item = val[k];
+          if (item && item.sensorId) {
+            sensorMap.set(item.sensorId, {
+              ...item,
+              id: item.id || k,
+            });
+          }
+        }
+        callback(Array.from(sensorMap.values()));
       }
     },
     (err) => {
